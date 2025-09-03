@@ -1,0 +1,5 @@
+[user]
+	email = roie.black@gmail.com
+	name = Roie Black
+[safe]
+	directory = /opt/homebrew

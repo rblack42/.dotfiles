@@ -1,0 +1,307 @@
+;; init.org -*- lexical-binding: t -*-
+#+title: Literate configuration for Emacs 30.1
+#+author: Roie R. Black
+#+date: 2025-08-22
+#+SETUPFILE: ./theme/theme-readtheorg-local.setup
+#+EXPORT_FILE_NAME: index
+
+* Literate Programming
+
+/Emacs org-mode/ supports a version of /Literate Programming/ pioneered by Professor Donald Knuth at Stanford in 1981. This scheme lets you create a document meant for human readers where you /explain/ how your code is designed. In that explanation, you can introduce blocks of code where the actual code you are developing actually live. These blocks are obviously designed to be short snippets, not the full code which is really meant to be processed by a computer program anyway. Multiple blocks can be stitched together using a tool Knuth
+
+called /Tangle/. In /Org-mode/ we mark each code clock and use a feature of /Org-mode/ (actually, /org-bable/) to extract the code and save it in files with proper names.
+
+This document uses /Emacs org-mode/ to build the *init.el* file, and a number of module files as well. /Emacs/ will be used to extract the actual *init.el* file and all defined modules. This
+can be done using simple commands in the editor, or using a *Makefile* included
+in this project.
+
+Here is the start of the *init.el* file:
+
+#+begin_src elisp :tangle init.el
+;; -*- lexical-binding: t -*-
+;; elisp.org - copyright 2025 by Roie Black
+;;-----------------------------------------
+#+end_src
+
+* Locating Component Files
+
+Rather than build one gigantic file, The configuration file will be broken up into separate parts, each focusing on one aspect of the configuration. This will enable testing of one major component at a time. The component files will be stored in a *modules* subdirectory. We need to tell /Emacs/ about this:
+
+#+begin_src elisp :tangle init.el
+;; Add module directory to load_path
+(add-to-list 'load-path "/Users/rblack/.emacs.d/modules")
+(add-to-list 'load-path ".")
+#+end_src
+
+Adding the current directory to the list is needed for exporting this file to /HTML/ when we generate a web page from this file.
+
+* Basic Functions
+
+/Emacs/ does a few things in its default configuration that I want to modify.
+These modifications will be placed in our first module:
+
+
+#+begin_src elisp :tangle modules/rrb-basic.el
+;; -*- lexical-binding: t -*-
+(setq
+    make-backup-files nil   ;; no backup files
+    auto-save-default nil)  ;; do not create auto save files
+(display-time-mode 1)       ;; Display time in mode line / tab bar
+(column-number-mode 1)      ;; Show column number on mode line
+;; Tabs to spaces
+(setq-default indent-tabs-mode nil
+	            tab-width 2)
+(global-visual-line-mode 1) ;; wrap long lines in all buffers
+
+;; Delete trailing whitespace before saving buffers
+(add-hook 'before-save-hook 'delete-trailing-whitespace)
+
+;; Move customization settings out of init.el
+(setq custom-file (expand-file-name "custom.el" user-emacs-directory))
+(when (file-exists-p custom-file)
+  (load custom-file t))
+#+end_src
+
+At the end of each module, we need to tell /Emacs/ what module this file provides:
+
+#+begin_src elisp :tangle modules/rrb-basic.el
+(provide 'rrb-basic)
+#+end_src
+
+To hook this module into the *init.el* file, we use the *require* function:
+
+#+begin_src elisp :tangle init.el
+;; hook modules into this file
+(require 'rrb-basic)
+#+end_src
+
+Now, when the (init.el* file is loaded, the /required/ module code files will also be processed.
+
+This completes our first module. We will use this same pattern will be used as we create more modules in this file.
+
+* Simplifying Startup Display
+
+When /Emacs/ first starts in graphics mode it normally displays a splash screen identifying the program and displaying a few links to interesting things you can explore. After the first few times you use the program, this becomes a distraction. We can do some basic set up to stop this.
+
+#+begin_src elisp :tangle modules/rrb-ui.el
+;; -*- lexical-binding: t -*-
+;; do not display the splash screen
+(when (display-graphic-p)
+  (tool-bar-mode 0)
+  (scroll-bar-mode 0))
+  ;; (menu-bar-mode 0) ; disabled here, not a problem on Mac
+(setq inhibit-startup-screen t)
+#+end_src
+
+* Create a Basic Theme
+
+There are many themes we could use. However, here is a basic block that sets colors in an easy to tweak block of code
+
+#+begin_src elisp :tangle modules/rrb-ui.el
+;; load an example dark theme
+(load-theme 'wombat)
+(with-eval-after-load 'wombat-theme
+  (set-face-background 'default "#111")
+  (set-face-background 'cursor "#c96")
+  (set-face-foreground 'font-lock-comment-face "#fc0")
+  (set-face-background 'isearch "#ff0")
+  (set-face-foreground 'isearch "#000")
+  (set-face-background 'lazy-highlight "#990")
+  (set-face-foreground 'lazy-highlight "#000"))
+#+end_src
+
+At this point, we need to indicate that this module provides *rrb_ui* so theloader will not complain:
+
+
+#+begin_src elisp :tangle modules/rrb-ui.el
+(provide 'rrb-ui)
+#+end_src
+
+Hook this module into the *init.el* file
+
+#+begin_src elisp :tangle init.el
+;; hook modules into this file
+(require 'rrb-ui)
+#+end_src
+
+* Package Management
+
+Before we add packages to the setup, we need to set up the package management
+system:
+
+#+begin_src elisp :tangle modules/rrb-package.el
+;; -*- lexical-binding: t -*-
+;;======================================================================
+;; package management
+;;
+;; Initialize package sources
+(require 'package)
+
+(setq package-archives '(("melpa" . "https://melpa.org/packages/")
+                         ("org" . "https://orgmode.org/elpa/")
+                         ("elpa" . "https://elpa.gnu.org/packages/")))
+
+(package-initialize)
+(unless package-archive-contents
+  (package-refresh-contents))
+
+  ;; Initialize use-package on non-Linux platforms
+(unless (package-installed-p 'use-package)
+  (package-install 'use-package))
+
+(require 'use-package)
+(setq use-package-always-ensure t)
+
+;; set up auto-update of package list
+(use-package auto-package-update
+  :custom
+  (auto-package-update-interval 7)
+  (auto-package-update-prompt-before-update t)
+  (auto-package-update-hide-results t)
+  :config
+  (auto-package-update-maybe)
+  (auto-package-update-at-time "09:00"))
+
+(provide 'rrb-package)
+#+end_src
+
+#+begin_src elisp :tangle init.el
+;; require the package system
+(require 'rrb-package)
+#+end_src
+
+* Window management
+
+To easily switch between windows, use *ace-window*:
+
+#+begin_src elisp :tangle modules/rrb-windows.el
+;; easily switch windows
+(use-package ace-window
+    :bind (("M-q" . ace-window)))
+
+(provide 'rrb-windows)
+#+end_src
+
+#+begin_src elisp :tangle init.el
+(require 'rrb-windows)
+#+end_src
+
+* Learning Key Mappings
+
+One of the first challenges you encounter when starting to use /Emacs/ is learning all the weird key combinations needed to make you really productive. /Emacs/ was invented well before the days of mouse-driven graphical environments, and using the keyboard was the only real way do do things. In today's world, key strokes can get things done faster than mouse clicks. Unfortunately, I never learned to type, so I use both schemes to do things.
+
+The /Which-Key/ package can help you learn the key combinations by providing a pop-up menu of possibilities if you pause after typing a /prefix/ combination like (*C-x*, *C-c*, or *C-h*). Here is the code needed to install this package:
+
+#+begin_src elisp :tangle modules/rrb-which.el
+;; -*- lexical-binding: t -*-
+;; get help with keymaps
+(use-package which-key
+  :init (which-key-mode)
+  :diminish which-key-mode
+  :config
+  (setq which-key-idle-delay 0.3))
+
+(provide 'rrb-which)
+#+end_src
+
+#+begin_src elisp :tangle init.el
+;; require the which-key package
+(require 'rrb-which)
+#+end_src
+
+* Spell Checking
+/Emacs/ has spell checking built in, but we need to set up a spell check application and associated dictionary. We will use /Hunspell/ to do the actual checking:
+
+#+begin_src elisp :tangle modules/rrb-spell.el
+  ;; -*- lexical-binding: t -*-
+  ;; Check spelling with flyspell and hunspell
+
+  (use-package flyspell
+    :custom
+    (ispell-program-name "hunspell")
+    (ispell-dictionary "en_US")
+    (ispellpersonal-dictionary "~/.emacs.d/rrb-personal-dict")
+    :config
+    (ispell-set-spellchecker-params)
+    :hook
+    (text-mode . flyspell-mode)
+    :bind
+    (("C-c w s s" . ispell)
+     ("C-;"       . flyspell-auto-correct-previous-word)))
+
+  (provide 'rrb-spell)
+#+end_src
+
+#+begin_src elisp :tangle init.el
+;; require the spell package
+(require 'rrb-spell)
+#+end_src
+
+* Managing Git Projects
+
+One of the most popular tools available in /Emacs/ is /Magit/. This tool makes
+managing a git repository pretty simple. Here is the code to add it:
+
+#+begin_src elisp :tangle modules/rrb-magit.el
+(use-package magit
+ :bind (("C-x g" . magit-status)
+       ("C-x M-g" . magit-blame))
+  :init (setq magit-auto-revert-mode nil)
+  :config (add-hook 'magit-mode-hook 'hl-line-mode))
+
+(provide 'rrb-magit)
+#+end_src
+
+#+begin_src elisp :tangle init.el
+;; Git project management
+(require 'rrb-magit)
+#+end_src
+
+* Configure Org Mode
+
+/Org Mode/ is one of the reasons /Emacs/ has become so popular. This mode allows users to create powerful ways to manage their work more efficiently. You can create many types of files that teach /To Do/ lists, keep a journal, track time spent on tasks. The list of possibilities seems endless! We will start off with a simple activation of this mode, which is actually built in in modern versions of /Emacs/, but must be activated.
+
+#+begin_src elisp :tangle modules/rrb-org.el
+(require 'org)
+#+end_src
+
+This is actually sufficient to enable basic /org-mode/ functionality. However, we need to enhance this setup a bit to really make it useful. This part of the configuration is personal - you might seek other setups.
+
+If you are using an older version of /Emacs/, you might need this block to associate files ending in *.org* with /org-mode/:
+
+#+begin_src elisp :tangle none
+;; Enable Org mode for files ending in .org
+;; (add-to-list 'auto-mode-alist '("\\.org$" . org-mode))
+;; (this is the default in current versions of Emacs
+#+end_src
+
+** Adding To-Do lists
+
+Things you need to get done fall into a number of simple categories. When you decide you need to do something, you have basically defined a /task/. Over time that task will move through a number of stages. Here is the list of stages I have decided to use:
+
+#+begin_src elisp :tangle modules/rrb-org.el
+  ;; define task state list
+  (setq org-todo-keywords
+    '((sequence "TODO" "PLANNING" "IN-PROGRESS" "WAITING" "|" "CANCELED" "DONE")))
+#+end_src
+
+WHen a task is marked as done, we will log a timestamp to that entry
+
+#+begin_src elisp :tangle modules/rrb-org.el
+  ;; when a TODO is done record a timestamp
+  (setq org-log-done 'time)
+#+end_src
+
+As you add *TODO* items (tasks) to your file, /Emacs/ can generate an /Agenda/ showing things you need to do. We need to tell the agenda system where these *.org* files are locasated:
+
+#+begin_src elisp :tangle modules/rrb-org.el
+
+#+end_src
+#+begin_src elisp :tangle modules/rrb-org.el
+  (provide 'rrb-org)
+#+end_src
+
+#+begin_src elisp :tangle modules/rrb-org.el
+;; require the org package
+(require 'rrb-org)
+#+end_src
