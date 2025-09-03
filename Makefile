@@ -27,9 +27,9 @@ dotunlink:
 
 .PHONY: html
 html:	$(OFILE)
-	cd emacs && \
-		emacs init.org --batch -l ~/.dotfiles/emacs/htmlize.el -f org-html-export-to-html --kill
-	mv emacs/index.html docs
+	cd emacs/dot-emacs.d && \
+		emacs init.org --batch -l ~/.dotfiles/emacs/dot-emacs.d/htmlize.el -f org-html-export-to-html --kill
+	mv emacs/dot-emacs.d/index.html docs
 
 .PHONY: init
 init:	$(OFILE) 
